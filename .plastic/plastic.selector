@@ -1,0 +1,3 @@
+rep "ServerIT/ServerIT@2475870999278@cloud"
+  path "/"
+    smartbranch "/main"
