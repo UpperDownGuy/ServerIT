@@ -2008,8 +2008,8 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 3d7d773280e357a4f854c9d3186a063d, type: 3}
   m_PrefabInstance: {fileID: 1907523878}
   m_PrefabAsset: {fileID: 0}
---- !u!65 &1907523883
-BoxCollider:
+--- !u!136 &1907523883
+CapsuleCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -2024,11 +2024,13 @@ BoxCollider:
     m_Bits: 0
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
-  m_ProvidesContacts: 0
+  m_ProvidesContacts: 1
   m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 2.0507805, y: 2.6605844, z: 0.7270918}
-  m_Center: {x: -0.28613624, y: 0.83028746, z: -0.014863873}
+  serializedVersion: 2
+  m_Radius: 1.0253903
+  m_Height: 2.6605844
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.83028746, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

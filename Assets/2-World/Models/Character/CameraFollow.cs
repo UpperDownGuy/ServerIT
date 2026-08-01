@@ -6,6 +6,11 @@ public class CameraFollow : MonoBehaviour
     [Header("Target")]
     public Transform target;
 
+    [Header("Head Sync")]
+    [Tooltip("Optional. Automatically found by name or humanoid rig when empty.")]
+    public Transform head;
+    public Vector3 headPitchAxis = Vector3.right;
+
     [Header("Mouse Look")]
     [Min(0f)] public float mouseSensitivity = 0.15f;
     [Range(-89f, 89f)] public float minimumPitch = -20f;
@@ -13,6 +18,7 @@ public class CameraFollow : MonoBehaviour
 
     private PlayerMovement playerMovement;
     private Quaternion startingLocalRotation;
+    private Quaternion startingHeadLocalRotation;
     private float cameraPitch;
     private bool wantsCursorLocked;
 
@@ -45,15 +51,59 @@ public class CameraFollow : MonoBehaviour
             return;
         }
 
-        // Parenting preserves the exact camera placement authored in the scene
-        // and gives the camera the Rigidbody's interpolated motion for free.
-        if (!transform.IsChildOf(target))
+        if (head == null)
         {
-            transform.SetParent(target, true);
+            head = FindHead(target);
+        }
+
+        // Preserve the camera placement authored in the scene, but make it
+        // relative to the head so body yaw and head pitch move the view as one.
+        Transform cameraParent = head != null ? head : target;
+        if (transform.parent != cameraParent)
+        {
+            transform.SetParent(cameraParent, true);
         }
 
         startingLocalRotation = transform.localRotation;
+        if (head != null)
+        {
+            startingHeadLocalRotation = head.localRotation;
+        }
+        else
+        {
+            Debug.LogWarning(
+                "CameraFollow could not find a head transform; pitch will only affect the camera.",
+                this);
+        }
+
         SetCursorLocked(true);
+    }
+
+    private static Transform FindHead(Transform characterRoot)
+    {
+        Animator animator = characterRoot.GetComponentInChildren<Animator>(true);
+        if (animator != null && animator.isHuman)
+        {
+            Transform humanoidHead = animator.GetBoneTransform(HumanBodyBones.Head);
+            if (humanoidHead != null)
+            {
+                return humanoidHead;
+            }
+        }
+
+        Transform[] descendants = characterRoot.GetComponentsInChildren<Transform>(true);
+        foreach (Transform descendant in descendants)
+        {
+            string candidate = descendant.name.ToLowerInvariant();
+            if (candidate == "head" ||
+                candidate.EndsWith(":head") ||
+                candidate.EndsWith(".head"))
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     private void Update()
@@ -98,6 +148,25 @@ public class CameraFollow : MonoBehaviour
             cameraPitch - lookDelta.y,
             minimumPitch,
             maximumPitch);
+    }
+
+    private void LateUpdate()
+    {
+        if (head != null)
+        {
+            Vector3 pitchAxis = headPitchAxis.sqrMagnitude > 0.0001f
+                ? headPitchAxis.normalized
+                : Vector3.right;
+
+            head.localRotation =
+                startingHeadLocalRotation *
+                Quaternion.AngleAxis(cameraPitch, pitchAxis);
+
+            // The camera inherits both body yaw and head pitch. Its authored
+            // head-relative rotation remains unchanged.
+            transform.localRotation = startingLocalRotation;
+            return;
+        }
 
         transform.localRotation =
             startingLocalRotation *

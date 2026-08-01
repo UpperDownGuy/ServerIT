@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(CapsuleCollider))]
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement")]
@@ -24,44 +25,21 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
-        ReplaceTurningBoxCollider();
-
         playerRigidbody = GetComponent<Rigidbody>();
+        CapsuleCollider playerCollider = GetComponent<CapsuleCollider>();
+
+        // The player collider is a solid, rotation-invariant wall boundary.
+        playerCollider.enabled = true;
+        playerCollider.isTrigger = false;
+        playerCollider.providesContacts = true;
+
+        playerRigidbody.detectCollisions = true;
         playerRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
         playerRigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         playerRigidbody.constraints |=
             RigidbodyConstraints.FreezeRotationX |
             RigidbodyConstraints.FreezeRotationZ;
         desiredYaw = playerRigidbody.rotation.eulerAngles.y;
-    }
-
-    private void ReplaceTurningBoxCollider()
-    {
-        BoxCollider boxCollider = GetComponent<BoxCollider>();
-        if (boxCollider == null || !boxCollider.enabled)
-        {
-            return;
-        }
-
-        CapsuleCollider capsuleCollider = GetComponent<CapsuleCollider>();
-        if (capsuleCollider == null)
-        {
-            capsuleCollider = gameObject.AddComponent<CapsuleCollider>();
-        }
-
-        // A centered vertical capsule has the same footprint at every yaw.
-        // This prevents the physics solver from shoving the player around when
-        // a rotating rectangular collider sweeps into nearby furniture/walls.
-        float radius = Mathf.Max(boxCollider.size.x, boxCollider.size.z) * 0.5f;
-        capsuleCollider.center = new Vector3(0f, boxCollider.center.y, 0f);
-        capsuleCollider.radius = radius;
-        capsuleCollider.height = Mathf.Max(boxCollider.size.y, radius * 2f);
-        capsuleCollider.direction = 1;
-        capsuleCollider.sharedMaterial = boxCollider.sharedMaterial;
-        capsuleCollider.isTrigger = boxCollider.isTrigger;
-        capsuleCollider.contactOffset = boxCollider.contactOffset;
-
-        boxCollider.enabled = false;
     }
 
     private void Update()
