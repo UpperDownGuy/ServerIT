@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 public class CameraFollow : MonoBehaviour
 {
@@ -11,6 +13,12 @@ public class CameraFollow : MonoBehaviour
     public Transform head;
     public Vector3 headPitchAxis = Vector3.right;
 
+    [Header("First Person Visibility")]
+    [Tooltip("Hides only the local character's head geometry so it cannot cover the camera view.")]
+    public bool hideFirstPersonHead = true;
+    [Tooltip("Name of the separate head mesh in the imported character model.")]
+    public string firstPersonHeadMeshName = "Cube.003";
+
     [Header("Mouse Look")]
     [Min(0f)] public float mouseSensitivity = 0.15f;
     [Range(-89f, 89f)] public float minimumPitch = -20f;
@@ -21,6 +29,8 @@ public class CameraFollow : MonoBehaviour
     private Quaternion startingHeadLocalRotation;
     private float cameraPitch;
     private bool wantsCursorLocked;
+    private Renderer[] hiddenFirstPersonRenderers;
+    private ShadowCastingMode[] originalShadowCastingModes;
 
     private void Awake()
     {
@@ -76,7 +86,62 @@ public class CameraFollow : MonoBehaviour
                 this);
         }
 
+        ConfigureFirstPersonVisibility();
+
         SetCursorLocked(true);
+    }
+
+    private void ConfigureFirstPersonVisibility()
+    {
+        if (!hideFirstPersonHead || string.IsNullOrWhiteSpace(firstPersonHeadMeshName))
+        {
+            return;
+        }
+
+        Renderer[] characterRenderers = target.GetComponentsInChildren<Renderer>(true);
+        Renderer headRenderer = null;
+
+        foreach (Renderer characterRenderer in characterRenderers)
+        {
+            if (characterRenderer.name == firstPersonHeadMeshName)
+            {
+                headRenderer = characterRenderer;
+                break;
+            }
+        }
+
+        if (headRenderer == null)
+        {
+            Debug.LogWarning(
+                $"CameraFollow could not find the first-person head mesh '{firstPersonHeadMeshName}'.",
+                this);
+            return;
+        }
+
+        // The eyes and mouth are separate sibling meshes in this model. Select
+        // them by their centers being inside the head bounds so the entire face
+        // is hidden without affecting the torso, arms, or legs.
+        Bounds headBounds = headRenderer.bounds;
+        headBounds.Expand(headBounds.size * 0.25f);
+
+        List<Renderer> renderersToHide = new List<Renderer>();
+        foreach (Renderer characterRenderer in characterRenderers)
+        {
+            if (characterRenderer == headRenderer ||
+                headBounds.Contains(characterRenderer.bounds.center))
+            {
+                renderersToHide.Add(characterRenderer);
+            }
+        }
+
+        hiddenFirstPersonRenderers = renderersToHide.ToArray();
+        originalShadowCastingModes = new ShadowCastingMode[hiddenFirstPersonRenderers.Length];
+
+        for (int i = 0; i < hiddenFirstPersonRenderers.Length; i++)
+        {
+            originalShadowCastingModes[i] = hiddenFirstPersonRenderers[i].shadowCastingMode;
+            hiddenFirstPersonRenderers[i].shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        }
     }
 
     private static Transform FindHead(Transform characterRoot)
@@ -181,6 +246,22 @@ public class CameraFollow : MonoBehaviour
     private void OnDisable()
     {
         SetCursorLocked(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (hiddenFirstPersonRenderers == null || originalShadowCastingModes == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < hiddenFirstPersonRenderers.Length; i++)
+        {
+            if (hiddenFirstPersonRenderers[i] != null)
+            {
+                hiddenFirstPersonRenderers[i].shadowCastingMode = originalShadowCastingModes[i];
+            }
+        }
     }
 
     private void SetCursorLocked(bool isLocked)
