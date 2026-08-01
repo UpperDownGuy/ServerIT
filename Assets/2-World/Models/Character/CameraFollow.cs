@@ -56,12 +56,12 @@ public class CameraFollow : MonoBehaviour
             head = FindHead(target);
         }
 
-        // Preserve the camera placement authored in the scene, but make it
-        // relative to the head so body yaw and head pitch move the view as one.
-        Transform cameraParent = head != null ? head : target;
-        if (transform.parent != cameraParent)
+        // Keep the camera on the stable Rigidbody root. Imported head bones can
+        // contain animation, non-uniform scale, and delayed pose updates that
+        // warp or invert a child camera.
+        if (transform.parent != target)
         {
-            transform.SetParent(cameraParent, true);
+            transform.SetParent(target, true);
         }
 
         startingLocalRotation = transform.localRotation;
@@ -152,6 +152,14 @@ public class CameraFollow : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (target != null && transform.parent != target)
+        {
+            // Also repairs the hierarchy immediately after a Play Mode script
+            // reload from versions that parented the camera to the head.
+            transform.SetParent(target, true);
+            startingLocalRotation = transform.localRotation;
+        }
+
         if (head != null)
         {
             Vector3 pitchAxis = headPitchAxis.sqrMagnitude > 0.0001f
@@ -161,13 +169,10 @@ public class CameraFollow : MonoBehaviour
             head.localRotation =
                 startingHeadLocalRotation *
                 Quaternion.AngleAxis(cameraPitch, pitchAxis);
-
-            // The camera inherits both body yaw and head pitch. Its authored
-            // head-relative rotation remains unchanged.
-            transform.localRotation = startingLocalRotation;
-            return;
         }
 
+        // Camera pitch stays in the stable body-root space. Body yaw is inherited
+        // directly from the Rigidbody, so camera and character turn together.
         transform.localRotation =
             startingLocalRotation *
             Quaternion.AngleAxis(cameraPitch, Vector3.right);

@@ -107,7 +107,6 @@ public class PlayerMovement : MonoBehaviour
         }
 
         playerRigidbody.linearVelocity = velocity;
-        playerRigidbody.MoveRotation(desiredRotation);
     }
 
     public void AddLookYaw(float yawDegrees)
@@ -118,6 +117,17 @@ public class PlayerMovement : MonoBehaviour
         }
 
         desiredYaw = Mathf.Repeat(desiredYaw + yawDegrees, 360f);
+
+        // Apply look yaw in the input frame so the body, head, and camera do not
+        // trail the mouse by one or two physics/interpolation steps. Rotation is
+        // collision-safe because the player uses a centered vertical capsule.
+        if (playerRigidbody == null)
+        {
+            playerRigidbody = GetComponent<Rigidbody>();
+        }
+
+        playerRigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.rotation = Quaternion.AngleAxis(desiredYaw, Vector3.up);
     }
 
     private void OnCollisionStay(Collision collision)
