@@ -19,6 +19,11 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("Name of the separate head mesh in the imported character model.")]
     public string firstPersonHeadMeshName = "Cube.003";
 
+    [Header("Camera Light")]
+    [Tooltip("Prevents lights attached to this camera from casting the local player onto walls.")]
+    public bool excludePlayerFromCameraLight = true;
+    public string localPlayerLightLayer = "LocalPlayer";
+
     [Header("Mouse Look")]
     [Min(0f)] public float mouseSensitivity = 0.15f;
     [Range(-89f, 89f)] public float minimumPitch = -20f;
@@ -31,6 +36,10 @@ public class CameraFollow : MonoBehaviour
     private bool wantsCursorLocked;
     private Renderer[] hiddenFirstPersonRenderers;
     private ShadowCastingMode[] originalShadowCastingModes;
+    private Renderer[] localPlayerRenderers;
+    private int[] originalRendererLayers;
+    private Light[] cameraLights;
+    private int[] originalLightCullingMasks;
 
     private void Awake()
     {
@@ -87,8 +96,43 @@ public class CameraFollow : MonoBehaviour
         }
 
         ConfigureFirstPersonVisibility();
+        ConfigureCameraLightExclusion();
 
         SetCursorLocked(true);
+    }
+
+    private void ConfigureCameraLightExclusion()
+    {
+        if (!excludePlayerFromCameraLight)
+        {
+            return;
+        }
+
+        int localPlayerLayer = LayerMask.NameToLayer(localPlayerLightLayer);
+        if (localPlayerLayer < 0)
+        {
+            Debug.LogWarning(
+                $"CameraFollow could not find the layer '{localPlayerLightLayer}'.",
+                this);
+            return;
+        }
+
+        localPlayerRenderers = target.GetComponentsInChildren<Renderer>(true);
+        originalRendererLayers = new int[localPlayerRenderers.Length];
+        for (int i = 0; i < localPlayerRenderers.Length; i++)
+        {
+            originalRendererLayers[i] = localPlayerRenderers[i].gameObject.layer;
+            localPlayerRenderers[i].gameObject.layer = localPlayerLayer;
+        }
+
+        int localPlayerMask = 1 << localPlayerLayer;
+        cameraLights = GetComponentsInChildren<Light>(true);
+        originalLightCullingMasks = new int[cameraLights.Length];
+        for (int i = 0; i < cameraLights.Length; i++)
+        {
+            originalLightCullingMasks[i] = cameraLights[i].cullingMask;
+            cameraLights[i].cullingMask &= ~localPlayerMask;
+        }
     }
 
     private void ConfigureFirstPersonVisibility()
@@ -250,6 +294,12 @@ public class CameraFollow : MonoBehaviour
 
     private void OnDestroy()
     {
+        RestoreFirstPersonVisibility();
+        RestoreCameraLightExclusion();
+    }
+
+    private void RestoreFirstPersonVisibility()
+    {
         if (hiddenFirstPersonRenderers == null || originalShadowCastingModes == null)
         {
             return;
@@ -260,6 +310,31 @@ public class CameraFollow : MonoBehaviour
             if (hiddenFirstPersonRenderers[i] != null)
             {
                 hiddenFirstPersonRenderers[i].shadowCastingMode = originalShadowCastingModes[i];
+            }
+        }
+    }
+
+    private void RestoreCameraLightExclusion()
+    {
+        if (localPlayerRenderers != null && originalRendererLayers != null)
+        {
+            for (int i = 0; i < localPlayerRenderers.Length; i++)
+            {
+                if (localPlayerRenderers[i] != null)
+                {
+                    localPlayerRenderers[i].gameObject.layer = originalRendererLayers[i];
+                }
+            }
+        }
+
+        if (cameraLights != null && originalLightCullingMasks != null)
+        {
+            for (int i = 0; i < cameraLights.Length; i++)
+            {
+                if (cameraLights[i] != null)
+                {
+                    cameraLights[i].cullingMask = originalLightCullingMasks[i];
+                }
             }
         }
     }
