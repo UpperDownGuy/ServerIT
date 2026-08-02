@@ -23,6 +23,12 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("Prevents lights attached to this camera from casting the local player onto walls.")]
     public bool excludePlayerFromCameraLight = true;
     public string localPlayerLightLayer = "LocalPlayer";
+    [Tooltip("Uses camera-child lights as stable first-person spot lights instead of rotating world lights.")]
+    public bool configureCameraLightsAsSpot = true;
+    [Min(0f)] public float cameraLightIntensity = 5f;
+    [Min(0f)] public float cameraLightRange = 85f;
+    [Range(1f, 179f)] public float cameraLightSpotAngle = 90f;
+    [Range(0f, 179f)] public float cameraLightInnerSpotAngle = 65f;
 
     [Header("Mouse Look")]
     [Min(0f)] public float mouseSensitivity = 0.15f;
@@ -96,9 +102,40 @@ public class CameraFollow : MonoBehaviour
         }
 
         ConfigureFirstPersonVisibility();
+        ConfigureCameraLights();
         ConfigureCameraLightExclusion();
 
         SetCursorLocked(true);
+    }
+
+    private void ConfigureCameraLights()
+    {
+        cameraLights = GetComponentsInChildren<Light>(true);
+        if (!configureCameraLightsAsSpot)
+        {
+            return;
+        }
+
+        foreach (Light cameraLight in cameraLights)
+        {
+            cameraLight.type = LightType.Spot;
+            cameraLight.intensity = cameraLightIntensity;
+            cameraLight.range = cameraLightRange;
+            cameraLight.spotAngle = cameraLightSpotAngle;
+            cameraLight.innerSpotAngle = Mathf.Min(
+                cameraLightInnerSpotAngle,
+                cameraLightSpotAngle);
+            cameraLight.bounceIntensity = 1f;
+            cameraLight.shadows = LightShadows.Soft;
+            cameraLight.shadowBias = 0.05f;
+            cameraLight.shadowNormalBias = 0.4f;
+            cameraLight.shadowNearPlane = 0.2f;
+
+            // A spot light at the optical center follows yaw and pitch without
+            // moving the world's primary illumination as the player looks.
+            cameraLight.transform.localPosition = Vector3.zero;
+            cameraLight.transform.localRotation = Quaternion.identity;
+        }
     }
 
     private void ConfigureCameraLightExclusion()
@@ -126,7 +163,10 @@ public class CameraFollow : MonoBehaviour
         }
 
         int localPlayerMask = 1 << localPlayerLayer;
-        cameraLights = GetComponentsInChildren<Light>(true);
+        if (cameraLights == null)
+        {
+            cameraLights = GetComponentsInChildren<Light>(true);
+        }
         originalLightCullingMasks = new int[cameraLights.Length];
         for (int i = 0; i < cameraLights.Length; i++)
         {
